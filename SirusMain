@@ -1,98 +1,235 @@
--- Сначала загружаем библиотеку и создаем окно
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "SirusHub",
-   Icon = 0,
-   LoadingTitle = "Rayfield Interface Suite",
-   LoadingSubtitle = "by Sirius",
+   Name = "SirusHub | Universal Fixed",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "Loadind Assets...",
+   LoadingSubtitle = "by V1",
+   ShowText = "Sirus", -- for mobile users to unhide Rayfield, change if you'd like
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false -- Prevents Rayfield from emitting warnings when the script has a version mismatch with the interface.
+
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "SiriusHubConfig",
-      FileName = "MainConfig"
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "SirusHub"
    },
-   KeySystem = false
+
+   Discord = {
+      Enabled = true, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "https://discord.gg/XmsmxxkhCF", -- The Discord invite code, do not include Discord.gg/. E.g. Discord.gg/ ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the Discord every time they load it up
+   },
+
+   KeySystem = true, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "Join to Discord to get key",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
+      FileName = "Key", -- It is recommended to use something unique, as other scripts using Rayfield may overwrite your key file
+      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"SirusHubAlpha23"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
+   }
 })
 
--- Затем определяем переменные и функции для хитбоксов
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
-local _G = {
-    HitboxEnabled = false,
-    HitboxSize = Vector3.new(10, 10, 10),
-    HitboxTransparency = 0.5
-}
+-- Глобальные настройки
+_G.HitboxEnabled = false
+_G.HitboxSizeValue = 10
+_G.HitboxSize = Vector3.new(10, 10, 10)
+_G.ESP_Enabled = false
+_G.ESP_Color = Color3.fromRGB(255, 0, 0)
+_G.Arrows_Enabled = false
+_G.Arrow_Radius = 150 
 
 local function applyHitbox(character)
-    if not character or character == LocalPlayer.Character then return end
-    local head = character:FindFirstChild("Head")
-    if head and head:IsA("BasePart") then
-        if _G.HitboxEnabled then
-            head.Size = _G.HitboxSize
-            head.Transparency = _G.HitboxTransparency
-            -- ИСПРАВЛЕНИЯ ЗДЕСЬ:
-            head.CanCollide = false -- Чтобы игроки не застревали
-            head.Massless = true    -- Чтобы голова ничего не весила
-        else
-            head.Size = Vector3.new(1, 1, 1)
-            head.Transparency = 0
-            head.CanCollide = true
-            head.Massless = false
+    if not character or character == LocalPlayer.Character or character.Name == LocalPlayer.Name then 
+        return 
+    end
+    
+    pcall(function()
+        local head = character:FindFirstChild("Head")
+        if head and head:IsA("BasePart") then
+            if _G.HitboxEnabled then
+                head.Size = _G.HitboxSize
+                head.Transparency = 0.5
+                head.CanCollide = false
+                head.Massless = true
+            else
+                head.Size = Vector3.new(1.2, 1.2, 1.2)
+                head.Transparency = 0
+                head.CanCollide = true
+                head.Massless = false
+            end
         end
+    end)
+end
+
+local function createESP(player)
+    local box = Drawing.new("Square")
+    local Outline = Drawing.new("Square")
+    local Dtext = Drawing.new("Text")
+    local arrow = Drawing.new("Circle")
+
+    -- Настройка объектов
+    box.Visible = false
+    box.Thickness = 3
+    box.Color = Color3.fromRGB(0, 0, 0) -- Исправлено: Color вместо color
+    box.Filled = false
+
+    Outline.Visible = false
+    Outline.Thickness = 1
+    Outline.Color = _G.ESP_Color
+    Outline.Filled = false
+
+    Dtext.Visible = false 
+    Dtext.Color = Color3.fromRGB(255, 255, 255)
+    Dtext.Size = 16
+    Dtext.Center = true
+    Dtext.Outline = true
+
+    arrow.Visible = false
+    arrow.Radius = 6 
+    arrow.Filled = true
+    arrow.NumSides = 32
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not player or not player.Parent then
+            pcall(function() 
+                box:Remove(); Outline:Remove(); Dtext:Remove(); arrow:Remove() 
+            end)
+            connection:Disconnect()
+            return
+        end
+
+        pcall(function()
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local RootPart = char.HumanoidRootPart
+                local RootPos, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
+
+                if _G.ESP_Enabled and OnScreen then
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        local HeadPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                        local LegPos = Camera:WorldToViewportPoint(RootPart.Position - Vector3.new(0, 3, 0))
+                        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - RootPart.Position).Magnitude
+                        
+                        local sizeX = 2000 / RootPos.Z
+                        local sizeY = HeadPos.Y - LegPos.Y
+                        local posX = RootPos.X - sizeX / 2
+                        local posY = RootPos.Y - sizeY / 2
+
+                        -- Внешняя черная обводка
+                        box.Visible = true
+                        box.Size = Vector2.new(sizeX, sizeY)
+                        box.Position = Vector2.new(posX, posY)
+
+                        -- Внутренняя цветная линия
+                        Outline.Visible = true
+                        Outline.Size = Vector2.new(sizeX, sizeY)
+                        Outline.Position = Vector2.new(posX, posY)
+                        Outline.Color = _G.ESP_Color
+
+                        Dtext.Visible = true
+                        Dtext.Text = "[" .. math.floor(dist) .. " studs]"
+                        Dtext.Position = Vector2.new(RootPos.X, posY + sizeY + 2)
+                    end
+                else
+                    box.Visible = false; Outline.Visible = false; Dtext.Visible = false
+                end
+
+                if _G.Arrows_Enabled then
+                    local ScreenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    local RelativePos = Camera.CFrame:PointToObjectSpace(RootPart.Position)
+                    local Angle = math.atan2(-RelativePos.X, -RelativePos.Z)
+                    local Direction = Vector2.new(math.sin(Angle), math.cos(Angle))
+                    
+                    arrow.Position = ScreenCenter + (Direction * _G.Arrow_Radius)
+                    arrow.Color = _G.ESP_Color
+                    arrow.Visible = not OnScreen 
+                else
+                    arrow.Visible = false
+                end
+            else
+                box.Visible = false; Outline.Visible = false; Dtext.Visible = false; arrow.Visible = false
+            end
+        end)
+    end)
+end
+
+-- Инициализация
+local function onPlayerAdded(player)
+    if player ~= LocalPlayer then
+        createESP(player)
+        player.CharacterAdded:Connect(function(character)
+            task.wait(0.5)
+            applyHitbox(character)
+        end)
+        if player.Character then applyHitbox(player.Character) end
     end
 end
 
--- Обработка персонажей (старых и новых)
-local function onCharacterAdded(char)
-    task.wait(0.5)
-    if _G.HitboxEnabled then
-        applyHitbox(char)
-    end
-end
+for _, player in pairs(Players:GetPlayers()) do onPlayerAdded(player) end
+Players.PlayerAdded:Connect(onPlayerAdded)
 
-for _, player in ipairs(Players:GetPlayers()) do
-    player.CharacterAdded:Connect(onCharacterAdded)
-end
+-- Интерфейс Rayfield
+local Tab = Window:CreateTab("Main", 4483362458)
 
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(onCharacterAdded)
-end)
-
--- Теперь создаем вкладку и добавляем элементы управления
-local Tab = Window:CreateTab("Главная", 4483362458)
-
-local Toggle = Tab:CreateToggle({
-   Name = "Hitbox Expander (Big Head)",
-   CurrentValue = false,
-   Flag = "HitboxToggle", 
-   Callback = function(Value)
-       _G.HitboxEnabled = Value
-       
-       for _, player in ipairs(Players:GetPlayers()) do
-           if player.Character then
-               applyHitbox(player.Character)
-           end
-       end
-   end,
+Tab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.HitboxEnabled = Value
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then applyHitbox(player.Character) end
+        end
+    end,
 })
 
--- Слайдер для изменения размера
 Tab:CreateSlider({
-   Name = "Размер хитбокса",
-   Range = {1, 50},
-   Increment = 1,
-   Suffix = "Studs",
-   CurrentValue = 10,
-   Flag = "HitboxSize",
-   Callback = function(Value)
-       _G.HitboxSize = Vector3.new(Value, Value, Value)
-       if _G.HitboxEnabled then
-           for _, player in ipairs(Players:GetPlayers()) do
-               if player.Character then applyHitbox(player.Character) end
-           end
-       end
-   end,
+    Name = "Hitbox Size",
+    Range = {1, 50},
+    Increment = 1,
+    Suffix = "Studs",
+    CurrentValue = 10,
+    Callback = function(Value)
+        _G.HitboxSizeValue = Value
+        _G.HitboxSize = Vector3.new(Value, Value, Value)
+        if _G.HitboxEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then applyHitbox(player.Character) end
+            end
+        end
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = false,
+    Callback = function(Value) _G.ESP_Enabled = Value end,
+})
+
+Tab:CreateToggle({
+    Name = "Arrows(Bug)",
+    CurrentValue = false,
+    Callback = function(Value) _G.Arrows_Enabled = Value end,
+})
+
+Tab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 0, 0),
+    Callback = function(Value) _G.ESP_Color = Value end
 })
 
 Rayfield:LoadConfiguration()
